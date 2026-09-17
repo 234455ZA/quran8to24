@@ -606,15 +606,6 @@ button{font-family:inherit;}
     state.mushafTrans = mt === '1';
   })();
 
-  // Build page -> [{surah, ayah}] index in true Qur'an order (surahs 1..114 already in order)
-  var pageIndex = {};
-  DATA.surahs.forEach(function(s){
-    DATA.ayat[s.no].forEach(function(ayah){
-      if(!pageIndex[ayah.p]) pageIndex[ayah.p] = [];
-      pageIndex[ayah.p].push({surah:s.no, ayah:ayah});
-    });
-  });
-
   if(state.theme){
     document.documentElement.setAttribute('data-theme', state.theme);
   }
@@ -770,36 +761,30 @@ button{font-family:inherit;}
   }
 
   function renderMushaf(){
-    var pageNum = state.page;
-    var items = pageIndex[pageNum] || [];
-    var startJuz = items.length ? items[0].ayah.j : '';
+    var s = DATA.surahs[state.surah - 1];
+    var ayat = DATA.ayat[state.surah];
+    var startPage = ayat[0].p, endPage = ayat[ayat.length - 1].p;
+    var pageLabel = startPage === endPage ? ('Mushaf page '+startPage) : ('Mushaf pages '+startPage+'–'+endPage);
 
     var html = '<div class="mushaf-page">';
-    html += '<div class="mushaf-page-head"><span>Juz '+startJuz+'</span><span>Madani Mushaf · Page '+pageNum+' of 604</span></div>';
+    html += '<div class="mushaf-page-head"><span>Surah '+s.no+' of 114</span><span>'+pageLabel+'</span></div>';
+    html += '<div class="mushaf-surah-title">'+s.name_ar+'</div>';
+    if(s.no !== 1 && s.no !== 9){
+      html += '<div class="mushaf-bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>';
+    }
 
-    var arabicOpen = false;
+    html += '<div class="mushaf-arabic">';
     var lastJuz = null;
     var transRows = [];
-
-    items.forEach(function(item){
-      var s = DATA.surahs[item.surah - 1];
-      var ayah = item.ayah;
-      if(ayah.a === 1){
-        if(arabicOpen){ html += '</div>'; arabicOpen = false; }
-        html += '<div class="mushaf-surah-title">'+s.name_ar+'</div>';
-        if(item.surah !== 1 && item.surah !== 9){
-          html += '<div class="mushaf-bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>';
-        }
-      }
-      if(!arabicOpen){ html += '<div class="mushaf-arabic">'; arabicOpen = true; }
+    ayat.forEach(function(ayah){
       if(ayah.j !== lastJuz){
         html += '<span class="juz-tag">Juz '+ayah.j+'</span>';
         lastJuz = ayah.j;
       }
       html += ayah.ar + ' <span class="mushaf-ayah-end">'+ayah.a+'</span> ';
-      transRows.push({surah:item.surah, ayah:ayah.a, name:s.name_roman, en:ayah.en});
+      transRows.push({surah:s.no, ayah:ayah.a, name:s.name_roman, en:ayah.en});
     });
-    if(arabicOpen) html += '</div>';
+    html += '</div>';
 
     html += '<div class="mushaf-translations'+(state.mushafTrans ? '' : ' hidden')+'" id="mushafTransPanel">';
     transRows.forEach(function(r){
@@ -807,13 +792,26 @@ button{font-family:inherit;}
               '<a class="listen-ayah" href="https://quran.com/'+r.surah+'/'+r.ayah+'?reciter=7" target="_blank" rel="noopener noreferrer" title="Listen — Mishary Alafasy">🔊</a></div>';
     });
     html += '</div>';
-    html += '<div style="text-align:center;margin-top:14px;"><button class="mushaf-toggle-trans" id="mushafTransToggle">'+(state.mushafTrans ? 'Hide translations' : 'Show translations for this page')+'</button></div>';
+    html += '<div style="text-align:center;margin-top:14px;"><button class="mushaf-toggle-trans" id="mushafTransToggle">'+(state.mushafTrans ? 'Hide translations' : 'Show translations for this surah')+'</button></div>';
+    html += '  <a class="listen-surah" style="margin-top:14px;" href="https://quran.com/'+s.no+'?reciter=7" target="_blank" rel="noopener noreferrer">';
+    html += '    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Listen — Mishary Rashid Alafasy';
+    html += '  </a>';
     html += '</div>'; // .mushaf-page
 
     html += '<div class="mushaf-nav">';
-    html += '<button class="nav-btn prev" id="mushafPrev"'+(pageNum<=1?' disabled':'')+'><span class="lbl">← Previous</span>Page '+(pageNum-1)+'</button>';
-    html += '<div class="page-jump">Go to page <input type="number" id="pageJumpInput" min="1" max="604" value="'+pageNum+'"></div>';
-    html += '<button class="nav-btn next" id="mushafNext"'+(pageNum>=604?' disabled':'')+'><span class="lbl">Next →</span>Page '+(pageNum+1)+'</button>';
+    if(state.surah > 1){
+      var prev = DATA.surahs[state.surah - 2];
+      html += '<button class="nav-btn prev" id="mushafPrev"><span class="lbl">← Previous</span>'+prev.name_roman+'</button>';
+    } else {
+      html += '<span></span>';
+    }
+    html += '<div class="page-jump">Surah <input type="number" id="pageJumpInput" min="1" max="114" value="'+state.surah+'"></div>';
+    if(state.surah < 114){
+      var next = DATA.surahs[state.surah];
+      html += '<button class="nav-btn next" id="mushafNext"><span class="lbl">Next →</span>'+next.name_roman+'</button>';
+    } else {
+      html += '<span></span>';
+    }
     html += '</div>';
 
     els.content.innerHTML = html;
@@ -822,11 +820,11 @@ button{font-family:inherit;}
     var nextBtn = document.getElementById('mushafNext');
     var jumpInput = document.getElementById('pageJumpInput');
     var transToggle = document.getElementById('mushafTransToggle');
-    if(prevBtn) prevBtn.addEventListener('click', function(){ goToPage(pageNum - 1); });
-    if(nextBtn) nextBtn.addEventListener('click', function(){ goToPage(pageNum + 1); });
+    if(prevBtn) prevBtn.addEventListener('click', function(){ goToSurah(state.surah - 1); });
+    if(nextBtn) nextBtn.addEventListener('click', function(){ goToSurah(state.surah + 1); });
     if(jumpInput) jumpInput.addEventListener('change', function(){
       var v = parseInt(this.value, 10);
-      if(!isNaN(v)) goToPage(v);
+      if(!isNaN(v)) goToSurah(v);
     });
     if(transToggle) transToggle.addEventListener('click', function(){
       state.mushafTrans = !state.mushafTrans;
@@ -849,33 +847,12 @@ button{font-family:inherit;}
     else renderSurah();
   }
 
-  function goToPage(n){
-    n = Math.min(604, Math.max(1, n));
-    state.page = n;
-    safeSet('maqra_page', String(n));
-    var items = pageIndex[n];
-    if(items && items.length){
-      state.surah = items[0].surah;
-      safeSet('maqra_surah', String(state.surah));
-    }
-    renderSurahList(els.search.value);
-    renderMushaf();
-  }
-
   function goToSurah(no){
     if(no < 1 || no > 114) return;
     state.surah = no;
     safeSet('maqra_surah', String(no));
-    if(state.viewMode === 'mushaf'){
-      var firstAyah = DATA.ayat[no][0];
-      state.page = firstAyah.p;
-      safeSet('maqra_page', String(state.page));
-      renderSurahList(els.search.value);
-      renderMushaf();
-    } else {
-      renderSurahList(els.search.value);
-      renderSurah();
-    }
+    renderSurahList(els.search.value);
+    render();
   }
 
   function openSidebar(){ els.sidebar.classList.add('open'); els.overlay.classList.add('show'); }
@@ -897,22 +874,14 @@ button{font-family:inherit;}
 
   els.ayahViewBtn.addEventListener('click', function(){
     if(state.viewMode === 'ayah') return;
-    var items = pageIndex[state.page];
-    if(items && items.length) state.surah = items[0].surah;
     state.viewMode = 'ayah';
     safeSet('maqra_viewmode', 'ayah');
-    safeSet('maqra_surah', String(state.surah));
-    renderSurahList(els.search.value);
     render();
   });
   els.mushafViewBtn.addEventListener('click', function(){
     if(state.viewMode === 'mushaf') return;
-    var firstAyah = DATA.ayat[state.surah][0];
-    state.page = firstAyah.p;
     state.viewMode = 'mushaf';
     safeSet('maqra_viewmode', 'mushaf');
-    safeSet('maqra_page', String(state.page));
-    renderSurahList(els.search.value);
     render();
   });
 
