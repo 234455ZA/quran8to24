@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:ital@0;1&family=Amiri+Quran&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root{
   --ink:#241C12;
@@ -345,6 +346,16 @@ button{font-family:inherit;}
   font-size:10.5px; color:var(--gold);
   font-family:'Source Serif 4', serif;
 }
+.mushaf-verse{transition:background .3s ease, box-shadow .3s ease; border-radius:3px; padding:1px 2px;}
+.mushaf-verse.playing{
+  background:color-mix(in srgb, var(--emerald) 16%, transparent);
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--emerald) 40%, transparent);
+}
+.mushaf-trans-row{transition:background .3s ease;}
+.mushaf-trans-row.playing{
+  background:color-mix(in srgb, var(--emerald) 10%, transparent);
+  border-radius:4px;
+}
 .juz-tag{
   display:inline-block; direction:ltr; font-size:10px; color:var(--emerald);
   border:1px solid var(--emerald-soft); border-radius:10px; padding:1px 8px;
@@ -385,6 +396,12 @@ button{font-family:inherit;}
 .ayah{
   padding:22px 0;
   border-bottom:1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  transition:background .3s ease;
+}
+.ayah.playing{
+  background:color-mix(in srgb, var(--emerald) 10%, transparent);
+  box-shadow:inset 3px 0 0 var(--emerald);
+  padding-left:14px;
 }
 .ayah:last-child{border-bottom:none;}
 
@@ -554,6 +571,58 @@ body{padding-bottom:76px;}
   .player-track, .player-status{font-size:12px;}
 }
 
+/* ---------- Account modal ---------- */
+.modal-overlay{
+  display:none;
+  position:fixed; inset:0; z-index:60;
+  background:rgba(0,0,0,.45);
+  align-items:center; justify-content:center;
+  padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:6px;
+  width:100%; max-width:420px;
+  max-height:86vh; overflow-y:auto;
+  box-shadow:0 12px 40px rgba(0,0,0,.3);
+}
+.modal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 18px; border-bottom:1px solid var(--line);
+  font-size:14px; font-weight:600; letter-spacing:.02em;
+}
+.modal-body{padding:18px;}
+.modal-body p{font-size:13px; line-height:1.6; color:var(--ink-soft); margin:0 0 12px;}
+.modal-body a{color:var(--emerald); text-decoration:underline;}
+.field{margin-bottom:12px;}
+.field label{display:block; font-size:11.5px; color:var(--ink-soft); margin-bottom:5px; text-transform:uppercase; letter-spacing:.04em;}
+.field input{
+  width:100%; background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+  color:var(--ink); padding:9px 11px; font-family:inherit; font-size:13.5px;
+}
+.field input:focus-visible{outline:2px solid var(--focus); outline-offset:1px;}
+.btn-primary, .btn-secondary{
+  font-family:inherit; font-size:13px; border-radius:20px; padding:9px 18px; cursor:pointer;
+}
+.btn-primary{background:var(--emerald); color:var(--paper); border:none;}
+.btn-primary:hover{background:var(--emerald-soft);}
+.btn-secondary{background:transparent; border:1px solid var(--line); color:var(--ink);}
+.btn-secondary:hover{border-color:var(--gold-soft); color:var(--gold);}
+.btn-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;}
+.acct-msg{font-size:12.5px; margin-top:10px; padding:8px 10px; border-radius:4px;}
+.acct-msg.error{background:color-mix(in srgb, var(--danger) 14%, transparent); color:var(--danger);}
+.acct-msg.ok{background:color-mix(in srgb, var(--emerald) 14%, transparent); color:var(--emerald);}
+.acct-user{font-size:13px; margin-bottom:14px;}
+.acct-user b{color:var(--gold);}
+.sql-box{
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:4px;
+  padding:10px; font-size:11px; font-family:monospace; white-space:pre-wrap;
+  max-height:160px; overflow-y:auto; margin-bottom:12px; direction:ltr;
+}
+.toggle-link{background:none; border:none; color:var(--emerald); text-decoration:underline; font-family:inherit; font-size:12.5px; cursor:pointer; padding:0;}
+
 @media (max-width:520px){
   :root{--ar-size:26px;}
   .content{padding:20px 14px 80px;}
@@ -602,10 +671,21 @@ body{padding-bottom:76px;}
         <button id="fontUp" aria-label="Larger Arabic text">A+</button>
       </div>
       <button class="icon-btn" id="themeBtn" aria-label="Toggle light and dark theme">◐</button>
+      <button class="icon-btn" id="accountBtn" aria-label="Account and sync">☁</button>
     </div>
 
     <div class="content" id="content"></div>
   </main>
+</div>
+
+<div class="modal-overlay" id="acctOverlay">
+  <div class="modal" role="dialog" aria-label="Account and sync">
+    <div class="modal-head">
+      <span>Account &amp; Sync</span>
+      <button class="icon-btn" id="acctClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="acctBody"></div>
+  </div>
 </div>
 
 <div class="player-bar" id="playerBar">
@@ -688,7 +768,11 @@ body{padding-bottom:76px;}
     playerTrack: document.getElementById('playerTrack'),
     playerStatus: document.getElementById('playerStatus'),
     playerReciter: document.getElementById('playerReciter'),
-    playerAudio: document.getElementById('playerAudio')
+    playerAudio: document.getElementById('playerAudio'),
+    accountBtn: document.getElementById('accountBtn'),
+    acctOverlay: document.getElementById('acctOverlay'),
+    acctClose: document.getElementById('acctClose'),
+    acctBody: document.getElementById('acctBody')
   };
 
   function renderSurahList(filter){
@@ -767,7 +851,7 @@ body{padding-bottom:76px;}
     }
 
     ayat.forEach(function(ayah){
-      html += '<div class="ayah'+(studyOn ? ' study':'')+'">';
+      html += '<div class="ayah'+(studyOn ? ' study':'')+'" data-surah="'+state.surah+'" data-ayah="'+ayah.a+'">';
       if(hasWbw && ayah.w){
         html += '<div class="ayah-line">';
         ayah.w.forEach(function(w, i){
@@ -846,14 +930,14 @@ body{padding-bottom:76px;}
         html += '<span class="juz-tag">Juz '+ayah.j+'</span>';
         lastJuz = ayah.j;
       }
-      html += ayah.ar + ' <span class="mushaf-ayah-end">'+ayah.a+'</span> ';
+      html += '<span class="mushaf-verse" data-surah="'+s.no+'" data-ayah="'+ayah.a+'">'+ayah.ar+' <span class="mushaf-ayah-end">'+ayah.a+'</span></span> ';
       transRows.push({surah:s.no, ayah:ayah.a, name:s.name_roman, en:ayah.en});
     });
     html += '</div>';
 
     html += '<div class="mushaf-translations'+(state.mushafTrans ? '' : ' hidden')+'" id="mushafTransPanel">';
     transRows.forEach(function(r){
-      html += '<div class="mushaf-trans-row"><b>'+r.name+' '+r.ayah+'</b><span>'+escapeHtml(r.en)+'</span>'+
+      html += '<div class="mushaf-trans-row" data-surah="'+r.surah+'" data-ayah="'+r.ayah+'"><b>'+r.name+' '+r.ayah+'</b><span>'+escapeHtml(r.en)+'</span>'+
               '<button class="listen-ayah" data-surah="'+r.surah+'" data-ayah="'+r.ayah+'" data-action="play-ayah" title="Play this ayah">🔊</button></div>';
     });
     html += '</div>';
@@ -911,6 +995,9 @@ body{padding-bottom:76px;}
     syncViewButtons();
     if(state.viewMode === 'mushaf') renderMushaf();
     else renderSurah();
+    if(typeof player !== 'undefined' && player.mode === 'ayah' && player.surah === state.surah && player.ayah){
+      setHighlight(player.surah, player.ayah, false);
+    }
   }
 
   function goToSurah(no){
@@ -919,6 +1006,7 @@ body{padding-bottom:76px;}
     safeSet('maqra_surah', String(no));
     renderSurahList(els.search.value);
     render();
+    schedulePush();
   }
 
   function openSidebar(){ els.sidebar.classList.add('open'); els.overlay.classList.add('show'); }
@@ -936,6 +1024,7 @@ body{padding-bottom:76px;}
     state.study = !state.study;
     safeSet('maqra_study', state.study ? '1' : '0');
     render();
+    schedulePush();
   });
 
   els.ayahViewBtn.addEventListener('click', function(){
@@ -943,12 +1032,14 @@ body{padding-bottom:76px;}
     state.viewMode = 'ayah';
     safeSet('maqra_viewmode', 'ayah');
     render();
+    schedulePush();
   });
   els.mushafViewBtn.addEventListener('click', function(){
     if(state.viewMode === 'mushaf') return;
     state.viewMode = 'mushaf';
     safeSet('maqra_viewmode', 'mushaf');
     render();
+    schedulePush();
   });
 
   els.themeBtn.addEventListener('click', function(){
@@ -963,17 +1054,20 @@ body{padding-bottom:76px;}
     document.documentElement.setAttribute('data-theme', next);
     state.theme = next;
     safeSet('maqra_theme', next);
+    schedulePush();
   });
 
   els.fontUp.addEventListener('click', function(){
     state.fontSize = Math.min(48, state.fontSize + 2);
     document.documentElement.style.setProperty('--ar-size', state.fontSize + 'px');
     safeSet('maqra_fontsize', String(state.fontSize));
+    schedulePush();
   });
   els.fontDown.addEventListener('click', function(){
     state.fontSize = Math.max(20, state.fontSize - 2);
     document.documentElement.style.setProperty('--ar-size', state.fontSize + 'px');
     safeSet('maqra_fontsize', String(state.fontSize));
+    schedulePush();
   });
 
   // ---------------- Audio player (ummahapi.com) ----------------
@@ -1014,6 +1108,16 @@ body{padding-bottom:76px;}
   function setStatus(msg){ els.playerStatus.textContent = msg; }
   function setTrack(msg){ els.playerTrack.textContent = msg; }
 
+  function clearHighlight(){
+    document.querySelectorAll('.playing').forEach(function(el){ el.classList.remove('playing'); });
+  }
+  function setHighlight(surah, ayah, scroll){
+    clearHighlight();
+    var found = document.querySelectorAll('[data-surah="'+surah+'"][data-ayah="'+ayah+'"]');
+    found.forEach(function(el){ el.classList.add('playing'); });
+    if(scroll && found.length) found[0].scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
   function fetchAyah(surah, ayah){
     var key = surah+':'+ayah;
     if(player.cache[key]) return Promise.resolve(player.cache[key]);
@@ -1042,21 +1146,25 @@ body{padding-bottom:76px;}
     setStatus('Loading…');
     fetchAyah(surah, ayah).then(function(data){
       var a = findReciterAudio(data, player.reciterId);
-      if(!a){ setStatus('No audio found for this reciter.'); return; }
+      if(!a){ setStatus('No audio found for this reciter.'); clearHighlight(); return; }
       if(a.ayah_audio){
         els.playerAudio.src = a.ayah_audio;
         setStatus('Playing this ayah — will continue to the next');
+        setHighlight(surah, ayah, true);
       } else if(a.surah_audio){
         player.mode = 'surah';
         els.playerAudio.src = a.surah_audio;
         setStatus(a.reciter + ' only has full-surah audio — playing the whole surah instead');
+        clearHighlight();
       } else {
         setStatus('This reciter has no audio available.');
+        clearHighlight();
         return;
       }
       els.playerAudio.play().catch(function(){ setStatus('Tap play to start — autoplay was blocked.'); });
     }).catch(function(err){
       setStatus('Could not reach the audio service (' + err.message + '). Check your connection.');
+      clearHighlight();
     });
   }
 
@@ -1067,11 +1175,12 @@ body{padding-bottom:76px;}
     var s = DATA.surahs[surah - 1];
     setTrack(s.name_roman + ' — full surah');
     setStatus('Loading…');
+    clearHighlight();
     fetchAyah(surah, 1).then(function(data){
       var a = findReciterAudio(data, player.reciterId);
       if(!a || !a.surah_audio){ setStatus('No full-surah audio for this reciter.'); return; }
       els.playerAudio.src = a.surah_audio;
-      setStatus('Playing the full surah');
+      setStatus('Playing the full surah (no live word/ayah tracking — this API only gives per-ayah timing when played ayah by ayah)');
       els.playerAudio.play().catch(function(){ setStatus('Tap play to start — autoplay was blocked.'); });
     }).catch(function(err){
       setStatus('Could not reach the audio service (' + err.message + '). Check your connection.');
@@ -1113,6 +1222,7 @@ body{padding-bottom:76px;}
       if(player.mode === 'surah') playSurah(player.surah);
       else playAyah(player.surah, player.ayah);
     }
+    schedulePush();
   });
   els.playerAudio.addEventListener('play', function(){ els.playerToggle.textContent = '⏸'; });
   els.playerAudio.addEventListener('pause', function(){ els.playerToggle.textContent = '▶'; });
@@ -1121,7 +1231,7 @@ body{padding-bottom:76px;}
       var total = DATA.surahs[player.surah - 1].total_ayah;
       if(player.ayah < total) playAyah(player.surah, player.ayah + 1);
       else if(player.surah < 114) playAyah(player.surah + 1, 1);
-      else setStatus('Reached the end of the Qur\u2019an.');
+      else { setStatus('Reached the end of the Qur\u2019an.'); clearHighlight(); }
     } else {
       setStatus('Finished.');
     }
@@ -1129,6 +1239,241 @@ body{padding-bottom:76px;}
   els.playerAudio.addEventListener('error', function(){
     if(els.playerAudio.src) setStatus('That audio file failed to load.');
   });
+
+  // ---------------- Account & cross-device sync (Supabase) ----------------
+  var SYNC_KEYS = ['surah','viewMode','study','theme','fontSize','mushafTrans'];
+  var sb = null;
+  var sbSession = null;
+  var pushTimer = null;
+
+  var SETUP_SQL =
+"create table if not exists public.maqra_progress (\n" +
+"  user_id uuid primary key references auth.users(id) on delete cascade,\n" +
+"  state jsonb not null default '{}'::jsonb,\n" +
+"  updated_at timestamptz not null default now()\n" +
+");\n\n" +
+"alter table public.maqra_progress enable row level security;\n\n" +
+"create policy \"select own progress\" on public.maqra_progress\n" +
+"  for select using (auth.uid() = user_id);\n" +
+"create policy \"insert own progress\" on public.maqra_progress\n" +
+"  for insert with check (auth.uid() = user_id);\n" +
+"create policy \"update own progress\" on public.maqra_progress\n" +
+"  for update using (auth.uid() = user_id);";
+
+  function initSupabase(){
+    if(sb) return sb;
+    var url = safeGet('maqra_sb_url');
+    var key = safeGet('maqra_sb_key');
+    if(!url || !key) return null;
+    try{
+      sb = window.supabase.createClient(url, key);
+    }catch(e){ sb = null; }
+    return sb;
+  }
+
+  function snapshotState(){
+    var snap = {};
+    SYNC_KEYS.forEach(function(k){ snap[k] = state[k]; });
+    snap.reciterId = player.reciterId;
+    return snap;
+  }
+
+  function applyRemoteState(remote){
+    if(!remote) return;
+    if(remote.surah && DATA.ayat[remote.surah]) state.surah = remote.surah;
+    if(remote.viewMode === 'ayah' || remote.viewMode === 'mushaf') state.viewMode = remote.viewMode;
+    if(typeof remote.study === 'boolean') state.study = remote.study;
+    if(remote.theme === 'light' || remote.theme === 'dark'){
+      state.theme = remote.theme;
+      document.documentElement.setAttribute('data-theme', remote.theme);
+    }
+    if(remote.fontSize){
+      state.fontSize = remote.fontSize;
+      document.documentElement.style.setProperty('--ar-size', remote.fontSize + 'px');
+    }
+    if(typeof remote.mushafTrans === 'boolean') state.mushafTrans = remote.mushafTrans;
+    if(remote.reciterId){
+      player.reciterId = remote.reciterId;
+      els.playerReciter.value = String(remote.reciterId);
+    }
+    safeSet('maqra_surah', String(state.surah));
+    safeSet('maqra_viewmode', state.viewMode);
+    safeSet('maqra_study', state.study ? '1' : '0');
+    if(state.theme) safeSet('maqra_theme', state.theme);
+    safeSet('maqra_fontsize', String(state.fontSize));
+    safeSet('maqra_mushaftrans', state.mushafTrans ? '1' : '0');
+    safeSet('maqra_reciter', String(player.reciterId));
+    renderSurahList(els.search.value);
+    render();
+  }
+
+  function pushState(){
+    if(!sb || !sbSession) return;
+    sb.from('maqra_progress').upsert({
+      user_id: sbSession.user.id,
+      state: snapshotState(),
+      updated_at: new Date().toISOString()
+    }).then(function(res){
+      if(res.error) console.warn('sync push failed', res.error.message);
+    });
+  }
+  function schedulePush(){
+    if(!sb || !sbSession) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushState, 1200);
+  }
+
+  function pullState(){
+    if(!sb || !sbSession) return Promise.resolve();
+    return sb.from('maqra_progress').select('state').eq('user_id', sbSession.user.id).maybeSingle()
+      .then(function(res){
+        if(res.error){ console.warn('sync pull failed', res.error.message); return; }
+        if(res.data && res.data.state) applyRemoteState(res.data.state);
+        else pushState(); // first sync: seed the row with current local state
+      });
+  }
+
+  function acctMsg(text, kind){
+    return '<div class="acct-msg '+(kind||'')+'">'+text+'</div>';
+  }
+
+  function renderAccountModal(){
+    var url = safeGet('maqra_sb_url');
+    var key = safeGet('maqra_sb_key');
+    var html = '';
+
+    if(!url || !key){
+      html += '<p>Cross-device sync uses your own free <a href="https://supabase.com" target="_blank" rel="noopener noreferrer">Supabase</a> project — real email/password accounts, nothing stored by me.</p>';
+      html += '<p><b>1.</b> Create a free project at supabase.com.<br><b>2.</b> Open the SQL editor and run this once:</p>';
+      html += '<div class="sql-box">'+escapeHtml(SETUP_SQL)+'</div>';
+      html += '<p><b>3.</b> Go to Project Settings → API, copy the Project URL and the <i>anon public</i> key, and paste them below.</p>';
+      html += '<div class="field"><label>Project URL</label><input type="text" id="sbUrlInput" placeholder="https://xxxxx.supabase.co"></div>';
+      html += '<div class="field"><label>Anon public key</label><input type="text" id="sbKeyInput" placeholder="eyJhbGciOi..."></div>';
+      html += '<div class="btn-row"><button class="btn-primary" id="sbConnectBtn">Connect</button></div>';
+      html += '<div id="acctMsgArea"></div>';
+    } else if(!sbSession){
+      html += '<div class="acct-msg" style="background:transparent;color:var(--ink-soft);padding:0;margin:0 0 14px;">Connected to your Supabase project. <button class="toggle-link" id="sbDisconnectBtn">Use a different project</button></div>';
+      html += '<div id="authForms">';
+      html += '  <div class="field"><label>Email</label><input type="email" id="authEmail" autocomplete="email"></div>';
+      html += '  <div class="field"><label>Password</label><input type="password" id="authPassword" autocomplete="current-password"></div>';
+      html += '  <div class="btn-row">';
+      html += '    <button class="btn-primary" id="loginBtn">Log in</button>';
+      html += '    <button class="btn-secondary" id="signupBtn">Create account</button>';
+      html += '  </div>';
+      html += '  <p style="margin-top:10px;">Creating an account sends a confirmation email by default — check your inbox (or turn confirmation off in Supabase → Authentication → Providers → Email, for testing).</p>';
+      html += '</div>';
+      html += '<div id="acctMsgArea"></div>';
+    } else {
+      html += '<div class="acct-user">Signed in as <b>'+escapeHtml(sbSession.user.email)+'</b></div>';
+      html += '<div class="btn-row">';
+      html += '  <button class="btn-primary" id="syncNowBtn">Sync now</button>';
+      html += '  <button class="btn-secondary" id="logoutBtn">Log out</button>';
+      html += '</div>';
+      html += '<p style="margin-top:14px;">Your surah, view mode, theme, font size and reciter follow you to any device you log into.</p>';
+      html += '<div id="acctMsgArea"></div>';
+    }
+    els.acctBody.innerHTML = html;
+    wireAccountForm();
+  }
+
+  function wireAccountForm(){
+    var connectBtn = document.getElementById('sbConnectBtn');
+    if(connectBtn) connectBtn.addEventListener('click', function(){
+      var url = document.getElementById('sbUrlInput').value.trim();
+      var key = document.getElementById('sbKeyInput').value.trim();
+      if(!url || !key){
+        document.getElementById('acctMsgArea').innerHTML = acctMsg('Please fill in both fields.', 'error');
+        return;
+      }
+      safeSet('maqra_sb_url', url);
+      safeSet('maqra_sb_key', key);
+      sb = null;
+      var client = initSupabase();
+      if(!client){
+        document.getElementById('acctMsgArea').innerHTML = acctMsg('Could not create the Supabase client — double check the URL and key.', 'error');
+        return;
+      }
+      checkExistingSession(true);
+    });
+
+    var disconnectBtn = document.getElementById('sbDisconnectBtn');
+    if(disconnectBtn) disconnectBtn.addEventListener('click', function(){
+      if(sb && sbSession) sb.auth.signOut();
+      safeSet('maqra_sb_url', '');
+      safeSet('maqra_sb_key', '');
+      sb = null; sbSession = null;
+      renderAccountModal();
+    });
+
+    var loginBtn = document.getElementById('loginBtn');
+    if(loginBtn) loginBtn.addEventListener('click', function(){
+      var email = document.getElementById('authEmail').value.trim();
+      var pass = document.getElementById('authPassword').value;
+      document.getElementById('acctMsgArea').innerHTML = acctMsg('Logging in…');
+      initSupabase().auth.signInWithPassword({email:email, password:pass}).then(function(res){
+        if(res.error){ document.getElementById('acctMsgArea').innerHTML = acctMsg(res.error.message, 'error'); return; }
+        sbSession = res.data.session;
+        pullState().then(function(){ renderAccountModal(); });
+      });
+    });
+
+    var signupBtn = document.getElementById('signupBtn');
+    if(signupBtn) signupBtn.addEventListener('click', function(){
+      var email = document.getElementById('authEmail').value.trim();
+      var pass = document.getElementById('authPassword').value;
+      if(pass.length < 6){
+        document.getElementById('acctMsgArea').innerHTML = acctMsg('Password should be at least 6 characters.', 'error');
+        return;
+      }
+      document.getElementById('acctMsgArea').innerHTML = acctMsg('Creating account…');
+      initSupabase().auth.signUp({email:email, password:pass}).then(function(res){
+        if(res.error){ document.getElementById('acctMsgArea').innerHTML = acctMsg(res.error.message, 'error'); return; }
+        if(res.data.session){
+          sbSession = res.data.session;
+          pullState().then(function(){ renderAccountModal(); });
+        } else {
+          document.getElementById('acctMsgArea').innerHTML = acctMsg('Account created — check your email to confirm, then log in.', 'ok');
+        }
+      });
+    });
+
+    var logoutBtn = document.getElementById('logoutBtn');
+    if(logoutBtn) logoutBtn.addEventListener('click', function(){
+      sb.auth.signOut().then(function(){
+        sbSession = null;
+        renderAccountModal();
+      });
+    });
+
+    var syncNowBtn = document.getElementById('syncNowBtn');
+    if(syncNowBtn) syncNowBtn.addEventListener('click', function(){
+      document.getElementById('acctMsgArea').innerHTML = acctMsg('Syncing…');
+      pullState().then(function(){
+        document.getElementById('acctMsgArea').innerHTML = acctMsg('Synced.', 'ok');
+      });
+    });
+  }
+
+  function checkExistingSession(openModal){
+    var client = initSupabase();
+    if(!client){ if(openModal) renderAccountModal(); return; }
+    client.auth.getSession().then(function(res){
+      sbSession = res.data && res.data.session ? res.data.session : null;
+      if(sbSession) pullState();
+      if(openModal) renderAccountModal();
+    });
+  }
+
+  els.accountBtn.addEventListener('click', function(){
+    renderAccountModal();
+    els.acctOverlay.classList.add('show');
+  });
+  els.acctClose.addEventListener('click', function(){ els.acctOverlay.classList.remove('show'); });
+  els.acctOverlay.addEventListener('click', function(e){
+    if(e.target === els.acctOverlay) els.acctOverlay.classList.remove('show');
+  });
+
+  checkExistingSession(false);
 
   renderSurahList('');
   render();
