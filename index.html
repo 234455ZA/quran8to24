@@ -1241,6 +1241,8 @@ body{padding-bottom:76px;}
   });
 
   // ---------------- Account & cross-device sync (Supabase) ----------------
+  var SB_URL = 'https://ejwcxwzxlekoutknngtz.supabase.co';
+  var SB_KEY = 'sb_publishable_b_XTX9vAZkQoW8TfafjMgQ_vn-nR0Ye';
   var SYNC_KEYS = ['surah','viewMode','study','theme','fontSize','mushafTrans'];
   var sb = null;
   var sbSession = null;
@@ -1262,13 +1264,14 @@ body{padding-bottom:76px;}
 
   function initSupabase(){
     if(sb) return sb;
-    var url = safeGet('maqra_sb_url');
-    var key = safeGet('maqra_sb_key');
-    if(!url || !key) return null;
     try{
-      sb = window.supabase.createClient(url, key);
+      sb = window.supabase.createClient(SB_URL, SB_KEY);
     }catch(e){ sb = null; }
     return sb;
+  }
+  function isMissingTableError(err){
+    if(!err) return false;
+    return err.code === '42P01' || (err.message && err.message.toLowerCase().indexOf('does not exist') !== -1);
   }
 
   function snapshotState(){
@@ -1307,6 +1310,7 @@ body{padding-bottom:76px;}
     render();
   }
 
+  var lastPushError = null;
   function pushState(){
     if(!sb || !sbSession) return;
     sb.from('maqra_progress').upsert({
@@ -1314,7 +1318,14 @@ body{padding-bottom:76px;}
       state: snapshotState(),
       updated_at: new Date().toISOString()
     }).then(function(res){
-      if(res.error) console.warn('sync push failed', res.error.message);
+      if(res.error){
+        console.warn('sync push failed', res.error.message);
+        lastPushError = res.error.message;
+      } else {
+        lastPushError = null;
+      }
+    }).catch(function(err){
+      lastPushError = (err && err.message) ? err.message : String(err);
     });
   }
   function schedulePush(){
@@ -1324,12 +1335,20 @@ body{padding-bottom:76px;}
   }
 
   function pullState(){
-    if(!sb || !sbSession) return Promise.resolve();
+    if(!sb || !sbSession) return Promise.resolve({status:'ok'});
     return sb.from('maqra_progress').select('state').eq('user_id', sbSession.user.id).maybeSingle()
       .then(function(res){
-        if(res.error){ console.warn('sync pull failed', res.error.message); return; }
+        if(res.error){
+          console.warn('sync pull failed', res.error.message);
+          return {status: isMissingTableError(res.error) ? 'missing_table' : 'error', message: res.error.message};
+        }
         if(res.data && res.data.state) applyRemoteState(res.data.state);
         else pushState(); // first sync: seed the row with current local state
+        return {status:'ok'};
+      })
+      .catch(function(err){
+        console.warn('sync pull threw', err);
+        return {status:'error', message: (err && err.message) ? err.message : String(err)};
       });
   }
 
@@ -1338,21 +1357,9 @@ body{padding-bottom:76px;}
   }
 
   function renderAccountModal(){
-    var url = safeGet('maqra_sb_url');
-    var key = safeGet('maqra_sb_key');
     var html = '';
 
-    if(!url || !key){
-      html += '<p>Cross-device sync uses your own free <a href="https://supabase.com" target="_blank" rel="noopener noreferrer">Supabase</a> project — real email/password accounts, nothing stored by me.</p>';
-      html += '<p><b>1.</b> Create a free project at supabase.com.<br><b>2.</b> Open the SQL editor and run this once:</p>';
-      html += '<div class="sql-box">'+escapeHtml(SETUP_SQL)+'</div>';
-      html += '<p><b>3.</b> Go to Project Settings → API, copy the Project URL and the <i>anon public</i> key, and paste them below.</p>';
-      html += '<div class="field"><label>Project URL</label><input type="text" id="sbUrlInput" placeholder="https://xxxxx.supabase.co"></div>';
-      html += '<div class="field"><label>Anon public key</label><input type="text" id="sbKeyInput" placeholder="eyJhbGciOi..."></div>';
-      html += '<div class="btn-row"><button class="btn-primary" id="sbConnectBtn">Connect</button></div>';
-      html += '<div id="acctMsgArea"></div>';
-    } else if(!sbSession){
-      html += '<div class="acct-msg" style="background:transparent;color:var(--ink-soft);padding:0;margin:0 0 14px;">Connected to your Supabase project. <button class="toggle-link" id="sbDisconnectBtn">Use a different project</button></div>';
+    if(!sbSession){
       html += '<div id="authForms">';
       html += '  <div class="field"><label>Email</label><input type="email" id="authEmail" autocomplete="email"></div>';
       html += '  <div class="field"><label>Password</label><input type="password" id="authPassword" autocomplete="current-password"></div>';
@@ -1360,9 +1367,14 @@ body{padding-bottom:76px;}
       html += '    <button class="btn-primary" id="loginBtn">Log in</button>';
       html += '    <button class="btn-secondary" id="signupBtn">Create account</button>';
       html += '  </div>';
-      html += '  <p style="margin-top:10px;">Creating an account sends a confirmation email by default — check your inbox (or turn confirmation off in Supabase → Authentication → Providers → Email, for testing).</p>';
+      html += '  <p style="margin-top:10px;">Creating an account may send a confirmation email first, depending on this project\'s settings — check your inbox if logging in right after signing up doesn\'t work yet.</p>';
       html += '</div>';
       html += '<div id="acctMsgArea"></div>';
+      html += '<button class="toggle-link" id="setupToggle" style="margin-top:16px;">First time setting this up? Show the one-time database setup</button>';
+      html += '<div id="setupBox" style="display:none;margin-top:10px;">';
+      html += '  <p>Run this once in your Supabase project\'s SQL editor so accounts have somewhere to sync progress to:</p>';
+      html += '  <div class="sql-box">'+escapeHtml(SETUP_SQL)+'</div>';
+      html += '</div>';
     } else {
       html += '<div class="acct-user">Signed in as <b>'+escapeHtml(sbSession.user.email)+'</b></div>';
       html += '<div class="btn-row">';
@@ -1370,6 +1382,9 @@ body{padding-bottom:76px;}
       html += '  <button class="btn-secondary" id="logoutBtn">Log out</button>';
       html += '</div>';
       html += '<p style="margin-top:14px;">Your surah, view mode, theme, font size and reciter follow you to any device you log into.</p>';
+      if(lastPushError){
+        html += acctMsg('A background sync just failed: ' + escapeHtml(lastPushError), 'error');
+      }
       html += '<div id="acctMsgArea"></div>';
     }
     els.acctBody.innerHTML = html;
@@ -1377,32 +1392,10 @@ body{padding-bottom:76px;}
   }
 
   function wireAccountForm(){
-    var connectBtn = document.getElementById('sbConnectBtn');
-    if(connectBtn) connectBtn.addEventListener('click', function(){
-      var url = document.getElementById('sbUrlInput').value.trim();
-      var key = document.getElementById('sbKeyInput').value.trim();
-      if(!url || !key){
-        document.getElementById('acctMsgArea').innerHTML = acctMsg('Please fill in both fields.', 'error');
-        return;
-      }
-      safeSet('maqra_sb_url', url);
-      safeSet('maqra_sb_key', key);
-      sb = null;
-      var client = initSupabase();
-      if(!client){
-        document.getElementById('acctMsgArea').innerHTML = acctMsg('Could not create the Supabase client — double check the URL and key.', 'error');
-        return;
-      }
-      checkExistingSession(true);
-    });
-
-    var disconnectBtn = document.getElementById('sbDisconnectBtn');
-    if(disconnectBtn) disconnectBtn.addEventListener('click', function(){
-      if(sb && sbSession) sb.auth.signOut();
-      safeSet('maqra_sb_url', '');
-      safeSet('maqra_sb_key', '');
-      sb = null; sbSession = null;
-      renderAccountModal();
+    var setupToggle = document.getElementById('setupToggle');
+    if(setupToggle) setupToggle.addEventListener('click', function(){
+      var box = document.getElementById('setupBox');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
     });
 
     var loginBtn = document.getElementById('loginBtn');
@@ -1413,7 +1406,14 @@ body{padding-bottom:76px;}
       initSupabase().auth.signInWithPassword({email:email, password:pass}).then(function(res){
         if(res.error){ document.getElementById('acctMsgArea').innerHTML = acctMsg(res.error.message, 'error'); return; }
         sbSession = res.data.session;
-        pullState().then(function(){ renderAccountModal(); });
+        pullState().then(function(result){
+          renderAccountModal();
+          if(result.status === 'missing_table'){
+            document.getElementById('acctMsgArea').innerHTML = acctMsg('Signed in, but the sync table hasn\'t been set up yet — see "first time setup" below.', 'error');
+          } else if(result.status === 'error'){
+            document.getElementById('acctMsgArea').innerHTML = acctMsg('Signed in, but sync failed: ' + escapeHtml(result.message), 'error');
+          }
+        });
       });
     });
 
@@ -1448,8 +1448,14 @@ body{padding-bottom:76px;}
     var syncNowBtn = document.getElementById('syncNowBtn');
     if(syncNowBtn) syncNowBtn.addEventListener('click', function(){
       document.getElementById('acctMsgArea').innerHTML = acctMsg('Syncing…');
-      pullState().then(function(){
-        document.getElementById('acctMsgArea').innerHTML = acctMsg('Synced.', 'ok');
+      pullState().then(function(result){
+        if(result.status === 'missing_table'){
+          document.getElementById('acctMsgArea').innerHTML = acctMsg('The sync table doesn\'t exist yet in this project. Expand "first time setup" and run the SQL.', 'error');
+        } else if(result.status === 'error'){
+          document.getElementById('acctMsgArea').innerHTML = acctMsg('Sync failed: ' + escapeHtml(result.message), 'error');
+        } else {
+          document.getElementById('acctMsgArea').innerHTML = acctMsg('Synced.', 'ok');
+        }
       });
     });
   }
