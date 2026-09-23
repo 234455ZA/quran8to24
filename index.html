@@ -1360,6 +1360,11 @@ body{padding-bottom:76px;}
     var html = '';
 
     if(!sbSession){
+      html += '<button class="btn-secondary" id="githubBtn" style="width:100%;justify-content:center;display:flex;align-items:center;gap:8px;margin-bottom:14px;">';
+      html += '  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.7-1.4-1.7-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.5.1-3.2 0 0 1-.3 3.4 1.2a11.7 11.7 0 0 1 6.2 0c2.4-1.6 3.4-1.2 3.4-1.2.7 1.7.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>';
+      html += '  Continue with GitHub';
+      html += '</button>';
+      html += '<div style="text-align:center;color:var(--ink-soft);font-size:11.5px;margin-bottom:14px;">— or use email —</div>';
       html += '<div id="authForms">';
       html += '  <div class="field"><label>Email</label><input type="email" id="authEmail" autocomplete="email"></div>';
       html += '  <div class="field"><label>Password</label><input type="password" id="authPassword" autocomplete="current-password"></div>';
@@ -1392,6 +1397,17 @@ body{padding-bottom:76px;}
   }
 
   function wireAccountForm(){
+    var githubBtn = document.getElementById('githubBtn');
+    if(githubBtn) githubBtn.addEventListener('click', function(){
+      document.getElementById('acctMsgArea').innerHTML = acctMsg('Redirecting to GitHub…');
+      initSupabase().auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: window.location.href }
+      }).then(function(res){
+        if(res.error) document.getElementById('acctMsgArea').innerHTML = acctMsg(res.error.message, 'error');
+      });
+    });
+
     var setupToggle = document.getElementById('setupToggle');
     if(setupToggle) setupToggle.addEventListener('click', function(){
       var box = document.getElementById('setupBox');
@@ -1469,6 +1485,31 @@ body{padding-bottom:76px;}
       if(openModal) renderAccountModal();
     });
   }
+
+  // Catches session changes from OAuth redirects (GitHub) and email-confirmation
+  // links, which land back on this page as a full reload rather than a click.
+  var authRedirectPending = /[?&]code=/.test(window.location.search) || /access_token=/.test(window.location.hash);
+  (function watchAuthChanges(){
+    var client = initSupabase();
+    if(!client) return;
+    client.auth.onAuthStateChange(function(event, session){
+      sbSession = session;
+      if(event === 'SIGNED_IN' && authRedirectPending){
+        authRedirectPending = false;
+        if(window.history && window.history.replaceState){
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        pullState().then(function(){
+          els.acctOverlay.classList.add('show');
+          renderAccountModal();
+        });
+      } else if(session){
+        pullState();
+      } else if(els.acctOverlay.classList.contains('show')){
+        renderAccountModal();
+      }
+    });
+  })();
 
   els.accountBtn.addEventListener('click', function(){
     renderAccountModal();
