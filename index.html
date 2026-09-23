@@ -1402,7 +1402,7 @@ body{padding-bottom:76px;}
       document.getElementById('acctMsgArea').innerHTML = acctMsg('Redirecting to GitHub…');
       initSupabase().auth.signInWithOAuth({
         provider: 'github',
-        options: { redirectTo: window.location.href }
+        options: { redirectTo: 'https://234455za.github.io/quran8to24/' }
       }).then(function(res){
         if(res.error) document.getElementById('acctMsgArea').innerHTML = acctMsg(res.error.message, 'error');
       });
