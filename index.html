@@ -193,6 +193,32 @@ button{font-family:inherit;}
 .menu-btn{display:none;}
 @media (max-width: 860px){.menu-btn{display:flex;}}
 
+.account-pill{
+  display:flex; align-items:center; gap:7px;
+  background:var(--emerald);
+  border:none;
+  color:var(--paper);
+  border-radius:20px;
+  padding:8px 16px;
+  cursor:pointer;
+  font-family:'Source Serif 4', serif;
+  font-size:13px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.account-pill:hover{background:var(--emerald-soft);}
+.account-pill:focus-visible{outline:2px solid var(--focus); outline-offset:2px;}
+.account-pill.signed-in{
+  background:transparent;
+  border:1px solid var(--gold-soft);
+  color:var(--gold);
+}
+.account-pill.signed-in:hover{background:color-mix(in srgb, var(--gold-soft) 14%, transparent);}
+@media (max-width:600px){
+  .account-pill span:not(.account-icon){display:none;}
+  .account-pill{padding:8px 10px; border-radius:50%; width:34px; height:34px; justify-content:center;}
+}
+
 .mode-toggle{
   display:flex; align-items:center; gap:8px;
   border:1px solid var(--line);
@@ -616,6 +642,18 @@ body{padding-bottom:76px;}
 .acct-msg.ok{background:color-mix(in srgb, var(--emerald) 14%, transparent); color:var(--emerald);}
 .acct-user{font-size:13px; margin-bottom:14px;}
 .acct-user b{color:var(--gold);}
+.acct-avatar{
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; background:var(--paper-raised); border:1px solid var(--gold-soft);
+  flex:0 0 auto;
+}
+.avatar-choice{
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:8px;
+  font-size:20px; padding:8px 0; cursor:pointer;
+}
+.avatar-choice:hover{border-color:var(--gold-soft);}
+.avatar-choice.picked{border-color:var(--emerald); background:color-mix(in srgb, var(--emerald) 14%, transparent);}
 .sql-box{
   background:var(--paper-raised); border:1px solid var(--line); border-radius:4px;
   padding:10px; font-size:11px; font-family:monospace; white-space:pre-wrap;
@@ -671,7 +709,10 @@ body{padding-bottom:76px;}
         <button id="fontUp" aria-label="Larger Arabic text">A+</button>
       </div>
       <button class="icon-btn" id="themeBtn" aria-label="Toggle light and dark theme">◐</button>
-      <button class="icon-btn" id="accountBtn" aria-label="Account and sync">☁</button>
+      <button class="account-pill" id="accountBtn" aria-label="Account and sync">
+        <span class="account-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 12c2.7 0 4.9-2.2 4.9-4.9S14.7 2.2 12 2.2 7.1 4.4 7.1 7.1 9.3 12 12 12zm0 2.5c-3.3 0-9.8 1.6-9.8 4.9v2.4h19.6v-2.4c0-3.3-6.5-4.9-9.8-4.9z"/></svg></span>
+        <span id="accountBtnLabel">Sign in</span>
+      </button>
     </div>
 
     <div class="content" id="content"></div>
@@ -1218,9 +1259,13 @@ body{padding-bottom:76px;}
   els.playerReciter.addEventListener('change', function(){
     player.reciterId = parseInt(this.value, 10);
     safeSet('maqra_reciter', String(player.reciterId));
+    var name = RECITERS.find(function(r){ return r.id === player.reciterId; }).name;
     if(player.surah && player.ayah){
       if(player.mode === 'surah') playSurah(player.surah);
       else playAyah(player.surah, player.ayah);
+    } else {
+      setTrack('Reciter set: ' + name);
+      setStatus('Tap any 🔊 or "Play full surah" to start listening');
     }
     schedulePush();
   });
@@ -1244,9 +1289,11 @@ body{padding-bottom:76px;}
   var SB_URL = 'https://ejwcxwzxlekoutknngtz.supabase.co';
   var SB_KEY = 'sb_publishable_b_XTX9vAZkQoW8TfafjMgQ_vn-nR0Ye';
   var SYNC_KEYS = ['surah','viewMode','study','theme','fontSize','mushafTrans'];
+  var AVATARS = ['📖','🕌','🌙','⭐','🪶','🧭','🌿','📿','🎨','🦋','🌸','☕'];
   var sb = null;
   var sbSession = null;
   var pushTimer = null;
+  var profileAvatar = safeGet('maqra_avatar') || null;
 
   var SETUP_SQL =
 "create table if not exists public.maqra_progress (\n" +
@@ -1278,6 +1325,7 @@ body{padding-bottom:76px;}
     var snap = {};
     SYNC_KEYS.forEach(function(k){ snap[k] = state[k]; });
     snap.reciterId = player.reciterId;
+    snap.avatar = profileAvatar;
     return snap;
   }
 
@@ -1299,6 +1347,10 @@ body{padding-bottom:76px;}
       player.reciterId = remote.reciterId;
       els.playerReciter.value = String(remote.reciterId);
     }
+    if(remote.avatar && AVATARS.indexOf(remote.avatar) !== -1){
+      profileAvatar = remote.avatar;
+      safeSet('maqra_avatar', remote.avatar);
+    }
     safeSet('maqra_surah', String(state.surah));
     safeSet('maqra_viewmode', state.viewMode);
     safeSet('maqra_study', state.study ? '1' : '0');
@@ -1306,6 +1358,7 @@ body{padding-bottom:76px;}
     safeSet('maqra_fontsize', String(state.fontSize));
     safeSet('maqra_mushaftrans', state.mushafTrans ? '1' : '0');
     safeSet('maqra_reciter', String(player.reciterId));
+    updateAccountBtn();
     renderSurahList(els.search.value);
     render();
   }
@@ -1356,7 +1409,36 @@ body{padding-bottom:76px;}
     return '<div class="acct-msg '+(kind||'')+'">'+text+'</div>';
   }
 
+  function updateAccountBtn(){
+    var label = document.getElementById('accountBtnLabel');
+    if(!label) return;
+    if(sbSession){
+      label.textContent = sbSession.user.email.split('@')[0];
+      els.accountBtn.classList.add('signed-in');
+      var icon = els.accountBtn.querySelector('.account-icon');
+      if(icon) icon.textContent = profileAvatar || '';
+      if(icon && !profileAvatar){
+        icon.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 12c2.7 0 4.9-2.2 4.9-4.9S14.7 2.2 12 2.2 7.1 4.4 7.1 7.1 9.3 12 12 12zm0 2.5c-3.3 0-9.8 1.6-9.8 4.9v2.4h19.6v-2.4c0-3.3-6.5-4.9-9.8-4.9z"/></svg>';
+      }
+    } else {
+      label.textContent = 'Sign in';
+      els.accountBtn.classList.remove('signed-in');
+      var icon2 = els.accountBtn.querySelector('.account-icon');
+      if(icon2) icon2.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 12c2.7 0 4.9-2.2 4.9-4.9S14.7 2.2 12 2.2 7.1 4.4 7.1 7.1 9.3 12 12 12zm0 2.5c-3.3 0-9.8 1.6-9.8 4.9v2.4h19.6v-2.4c0-3.3-6.5-4.9-9.8-4.9z"/></svg>';
+    }
+  }
+
+  function avatarPickerHtml(open){
+    var html = '<div id="avatarPicker" style="display:'+(open?'grid':'none')+';grid-template-columns:repeat(6,1fr);gap:8px;margin:10px 0;">';
+    AVATARS.forEach(function(a){
+      html += '<button class="avatar-choice'+(profileAvatar===a?' picked':'')+'" data-avatar="'+a+'">'+a+'</button>';
+    });
+    html += '</div>';
+    return html;
+  }
+
   function renderAccountModal(){
+    updateAccountBtn();
     var html = '';
 
     if(!sbSession){
@@ -1381,12 +1463,17 @@ body{padding-bottom:76px;}
       html += '  <div class="sql-box">'+escapeHtml(SETUP_SQL)+'</div>';
       html += '</div>';
     } else {
-      html += '<div class="acct-user">Signed in as <b>'+escapeHtml(sbSession.user.email)+'</b></div>';
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">';
+      html += '  <div class="acct-avatar">'+(profileAvatar || '👤')+'</div>';
+      html += '  <div class="acct-user" style="margin-bottom:0;">Signed in as <b>'+escapeHtml(sbSession.user.email)+'</b></div>';
+      html += '</div>';
+      html += '<button class="toggle-link" id="avatarToggle">'+(profileAvatar ? 'Change profile picture' : 'Choose a profile picture')+'</button>';
+      html += avatarPickerHtml(!profileAvatar);
       html += '<div class="btn-row">';
       html += '  <button class="btn-primary" id="syncNowBtn">Sync now</button>';
       html += '  <button class="btn-secondary" id="logoutBtn">Log out</button>';
       html += '</div>';
-      html += '<p style="margin-top:14px;">Your surah, view mode, theme, font size and reciter follow you to any device you log into.</p>';
+      html += '<p style="margin-top:14px;">Your surah, view mode, theme, font size, reciter and profile picture follow you to any device you log into.</p>';
       if(lastPushError){
         html += acctMsg('A background sync just failed: ' + escapeHtml(lastPushError), 'error');
       }
@@ -1397,6 +1484,20 @@ body{padding-bottom:76px;}
   }
 
   function wireAccountForm(){
+    var avatarToggle = document.getElementById('avatarToggle');
+    if(avatarToggle) avatarToggle.addEventListener('click', function(){
+      var picker = document.getElementById('avatarPicker');
+      picker.style.display = picker.style.display === 'none' ? 'grid' : 'none';
+    });
+    document.querySelectorAll('.avatar-choice').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        profileAvatar = btn.getAttribute('data-avatar');
+        safeSet('maqra_avatar', profileAvatar);
+        schedulePush();
+        renderAccountModal();
+      });
+    });
+
     var githubBtn = document.getElementById('githubBtn');
     if(githubBtn) githubBtn.addEventListener('click', function(){
       document.getElementById('acctMsgArea').innerHTML = acctMsg('Redirecting to GitHub…');
@@ -1482,6 +1583,7 @@ body{padding-bottom:76px;}
     client.auth.getSession().then(function(res){
       sbSession = res.data && res.data.session ? res.data.session : null;
       if(sbSession) pullState();
+      updateAccountBtn();
       if(openModal) renderAccountModal();
     });
   }
@@ -1494,6 +1596,7 @@ body{padding-bottom:76px;}
     if(!client) return;
     client.auth.onAuthStateChange(function(event, session){
       sbSession = session;
+      updateAccountBtn();
       if(event === 'SIGNED_IN' && authRedirectPending){
         authRedirectPending = false;
         if(window.history && window.history.replaceState){
